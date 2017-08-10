@@ -35,6 +35,7 @@ CONFIG_AUTH = "auth.ini"
 
 PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <playlist version="1" xmlns="http://xspf.org/ns/0/">
+  <title>{{ title }}</title>
   <trackList>
 {%- for track in tracklist %}
     <track>
@@ -62,11 +63,9 @@ def process_tracks(tracks):
 def write_playlist(name, dirname, tracks):
     env = jinja2.Environment(autoescape=True)
     template = env.from_string(PLAYLIST_TEMPLATE)
-    content = template.render(tracklist=tracks)
+    content = template.render(title=name, tracklist=tracks)
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
-
-
 
     with open(xspf_path, "w") as f:
         f.write(content)
@@ -96,7 +95,7 @@ def import_playlist(sp, username, filename):
     tree = xml.etree.ElementTree.parse(filename)
     root = tree.getroot()
 
-    name = os.path.splitext(os.path.basename(filename))[0]
+    name = root.find("{http://xspf.org/ns/0/}title").text
     tracks = []
 
     for elem in root.findall("{http://xspf.org/ns/0/}trackList/{http://xspf.org/ns/0/}track"):
