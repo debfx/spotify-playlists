@@ -16,4 +16,5 @@ Examples:
 ## Setup
 
 * Follow <https://spotipy.readthedocs.io/en/latest/#authorized-requests>
-* Copy auth.ini.example to auth.ini and insert the client id, token and redirect uri
+* Copy auth.ini.example to auth.ini
+* Insert the client id, token, redirect uri and Spotify username in auth.ini
