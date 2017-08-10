@@ -1,0 +1,5 @@
+[spotify]
+client_id=ID
+client_secret=SECRET
+redirect_uri=http://localhost/
+username=SPOTIFY_USERNAME
