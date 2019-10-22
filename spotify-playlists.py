@@ -35,6 +35,9 @@ CONFIG_AUTH = "auth.ini"
 PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <playlist version="1" xmlns="http://xspf.org/ns/0/">
   <title>{{ title }}</title>
+{%- if location %}
+  <location>{{ location }}</location>
+{%- endif %}
   <trackList>
 {%- for track in tracklist %}
     <track>
@@ -64,10 +67,10 @@ def process_tracks(tracks):
     return result
 
 
-def write_playlist(name, dirname, tracks):
+def write_playlist(name, dirname, tracks, location=None):
     env = jinja2.Environment(autoescape=True)
     template = env.from_string(PLAYLIST_TEMPLATE)
-    content = template.render(title=name, tracklist=tracks)
+    content = template.render(title=name, location=location, tracklist=tracks)
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
 
@@ -82,13 +85,13 @@ def export_playlists(sp, username, dirname):
     playlists = sp.user_playlists(username)
 
     for playlist in playlists["items"]:
-        results = sp.user_playlist(playlist["owner"]["id"], playlist["id"], fields="tracks,next")
+        results = sp.user_playlist(playlist["owner"]["id"], playlist["id"], fields="name,uri,tracks,next")
         tracks = results["tracks"]
         tracks_processed = process_tracks(tracks)
         while tracks["next"]:
             tracks = sp.next(tracks)
             tracks_processed.extend(process_tracks(tracks))
-        write_playlist(playlist["name"], dirname, tracks_processed)
+        write_playlist(playlist["name"], dirname, tracks_processed, location=playlist["uri"])
 
     results = sp.current_user_saved_tracks()
     tracks_processed = process_tracks(results)
