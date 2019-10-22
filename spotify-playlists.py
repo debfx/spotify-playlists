@@ -28,6 +28,7 @@ SCOPES = (
     "playlist-read-private",
     "user-library-read",
     "playlist-modify-private",
+    "playlist-modify-public",
 )
 
 CONFIG_AUTH = "auth.ini"
@@ -38,6 +39,10 @@ PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 {%- if location %}
   <location>{{ location }}</location>
 {%- endif %}
+  <extension application="https://github.com/debfx/spotify-playlists">
+    <public>{{ public | string | lower }}</public>
+    <collaborative>{{ collaborative | string | lower }}</collaborative>
+  </extension>
   <trackList>
 {%- for track in tracklist %}
     <track>
@@ -67,10 +72,10 @@ def process_tracks(tracks):
     return result
 
 
-def write_playlist(name, dirname, tracks, location=None):
+def write_playlist(name, dirname, tracks, location=None, public=False, collaborative=False):
     env = jinja2.Environment(autoescape=True)
     template = env.from_string(PLAYLIST_TEMPLATE)
-    content = template.render(title=name, location=location, tracklist=tracks)
+    content = template.render(title=name, location=location, tracklist=tracks, public=public, collaborative=collaborative)
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
 
@@ -85,13 +90,13 @@ def export_playlists(sp, username, dirname):
     playlists = sp.user_playlists(username)
 
     for playlist in playlists["items"]:
-        results = sp.user_playlist(playlist["owner"]["id"], playlist["id"], fields="name,uri,tracks,next")
+        results = sp.user_playlist(playlist["owner"]["id"], playlist["id"], fields="name,uri,public,collaborative,tracks,next")
         tracks = results["tracks"]
         tracks_processed = process_tracks(tracks)
         while tracks["next"]:
             tracks = sp.next(tracks)
             tracks_processed.extend(process_tracks(tracks))
-        write_playlist(playlist["name"], dirname, tracks_processed, location=playlist["uri"])
+        write_playlist(playlist["name"], dirname, tracks_processed, location=playlist["uri"], public=playlist["public"], collaborative=playlist["collaborative"])
 
     results = sp.current_user_saved_tracks()
     tracks_processed = process_tracks(results)
@@ -104,12 +109,26 @@ def import_playlist(sp, username, filename):
 
     name = root.find("{http://xspf.org/ns/0/}title").text
     tracks = []
+    public = False
+    collaborative = False
 
     for elem in root.findall("{http://xspf.org/ns/0/}trackList/{http://xspf.org/ns/0/}track"):
         location = elem.find("{http://xspf.org/ns/0/}location").text
         tracks.append(location)
 
-    playlist_id = sp.user_playlist_create(username, name, public=False)["id"]
+    elem_extension = root.find("{http://xspf.org/ns/0/}extension[@application='https://github.com/debfx/spotify-playlists']")
+    if elem_extension is not None:
+        elem_public = elem_extension.find("{http://xspf.org/ns/0/}public")
+        if elem_public is not None:
+            public = elem_public.text.lower() == "true"
+
+        elem_collaborative = elem_extension.find("{http://xspf.org/ns/0/}collaborative")
+        if elem_collaborative is not None:
+            collaborative = elem_collaborative.text.lower() == "true"
+
+    playlist_id = sp.user_playlist_create(username, name, public=public)["id"]
+    if collaborative:
+        sp.user_playlist_change_details(username, playlist_id, collaborative=collaborative)
 
     # the Spotify API allows only 100 tracks per request
     for tracks_chunk in chunks(tracks, 100):
