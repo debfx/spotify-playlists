@@ -48,6 +48,11 @@ PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
+def chunks(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i+n]
+
+
 def process_tracks(tracks):
     result = []
 
@@ -103,7 +108,9 @@ def import_playlist(sp, username, filename):
 
     playlist_id = sp.user_playlist_create(username, name, public=False)["id"]
 
-    sp.user_playlist_add_tracks(username, playlist_id, tracks)
+    # the Spotify API allows only 100 tracks per request
+    for tracks_chunk in chunks(tracks, 100):
+        sp.user_playlist_add_tracks(username, playlist_id, tracks_chunk)
 
 
 def main():
