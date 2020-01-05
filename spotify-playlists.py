@@ -66,6 +66,10 @@ def process_tracks(tracks):
 
     for item in tracks["items"]:
         track = item["track"]
+
+        if track is None:
+            # some playlists have extra "null" tracks (without any information), just skip them
+            continue
         artists = ";".join([ artist["name"] for artist in track["artists"] ])
         result.append({ "title": track["name"], "artists": artists, "uri": track["uri"] })
 
