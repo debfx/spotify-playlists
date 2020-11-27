@@ -104,8 +104,11 @@ def export_playlists(sp, username, dirname):
             tracks_processed.extend(process_tracks(tracks))
         write_playlist(playlist["name"], dirname, tracks_processed, type="playlist", location=playlist["uri"], public=playlist["public"], collaborative=playlist["collaborative"])
 
-    results = sp.current_user_saved_tracks()
-    tracks_processed = process_tracks(results)
+    tracks = sp.current_user_saved_tracks()
+    tracks_processed = process_tracks(tracks)
+    while tracks["next"]:
+        tracks = sp.next(tracks)
+        tracks_processed.extend(process_tracks(tracks))
     write_playlist("Saved tracks", dirname, tracks_processed, type="saved_tracks")
 
 
