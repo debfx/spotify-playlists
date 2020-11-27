@@ -43,6 +43,7 @@ PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
   <extension application="https://github.com/debfx/spotify-playlists">
     <public>{{ public | string | lower }}</public>
     <collaborative>{{ collaborative | string | lower }}</collaborative>
+    <type>{{ type }}</type>
   </extension>
   <trackList>
 {%- for track in tracklist %}
@@ -77,10 +78,10 @@ def process_tracks(tracks):
     return result
 
 
-def write_playlist(name, dirname, tracks, location=None, public=False, collaborative=False):
+def write_playlist(name, dirname, tracks, type, location=None, public=False, collaborative=False):
     env = jinja2.Environment(autoescape=True)
     template = env.from_string(PLAYLIST_TEMPLATE)
-    content = template.render(title=name, location=location, tracklist=tracks, public=public, collaborative=collaborative)
+    content = template.render(title=name, location=location, tracklist=tracks, type=type, public=public, collaborative=collaborative)
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
 
@@ -101,11 +102,11 @@ def export_playlists(sp, username, dirname):
         while tracks["next"]:
             tracks = sp.next(tracks)
             tracks_processed.extend(process_tracks(tracks))
-        write_playlist(playlist["name"], dirname, tracks_processed, location=playlist["uri"], public=playlist["public"], collaborative=playlist["collaborative"])
+        write_playlist(playlist["name"], dirname, tracks_processed, type="playlist", location=playlist["uri"], public=playlist["public"], collaborative=playlist["collaborative"])
 
     results = sp.current_user_saved_tracks()
     tracks_processed = process_tracks(results)
-    write_playlist("Saved tracks", dirname, tracks_processed)
+    write_playlist("Saved tracks", dirname, tracks_processed, type="saved_tracks")
 
 
 def import_playlist(sp, username, filename):
