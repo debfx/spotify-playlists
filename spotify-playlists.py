@@ -16,12 +16,13 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import configparser
-import jinja2
 import os
-import spotipy
-import spotipy.util
 import sys
 import xml.etree.ElementTree
+
+import jinja2
+import spotipy
+import spotipy.util
 
 SCOPES = (
     "playlist-read-collaborative",
