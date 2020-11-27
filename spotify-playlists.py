@@ -72,8 +72,8 @@ def process_tracks(tracks):
         if track is None:
             # some playlists have extra "null" tracks (without any information), just skip them
             continue
-        artists = ";".join([ artist["name"] for artist in track["artists"] ])
-        result.append({ "title": track["name"], "artists": artists, "uri": track["uri"] })
+        artists = ";".join([artist["name"] for artist in track["artists"]])
+        result.append({"title": track["name"], "artists": artists, "uri": track["uri"]})
 
     return result
 
@@ -81,7 +81,14 @@ def process_tracks(tracks):
 def write_playlist(name, dirname, tracks, type, location=None, public=False, collaborative=False):
     env = jinja2.Environment(autoescape=True)
     template = env.from_string(PLAYLIST_TEMPLATE)
-    content = template.render(title=name, location=location, tracklist=tracks, type=type, public=public, collaborative=collaborative)
+    content = template.render(
+        title=name,
+        location=location,
+        tracklist=tracks,
+        type=type,
+        public=public,
+        collaborative=collaborative
+    )
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
 
@@ -96,13 +103,25 @@ def export_playlists(sp, username, dirname):
     playlists = sp.user_playlists(username)
 
     for playlist in playlists["items"]:
-        results = sp.user_playlist(playlist["owner"]["id"], playlist["id"], fields="name,uri,public,collaborative,tracks,next")
+        results = sp.user_playlist(
+            playlist["owner"]["id"],
+            playlist["id"],
+            fields="name,uri,public,collaborative,tracks,next"
+        )
         tracks = results["tracks"]
         tracks_processed = process_tracks(tracks)
         while tracks["next"]:
             tracks = sp.next(tracks)
             tracks_processed.extend(process_tracks(tracks))
-        write_playlist(playlist["name"], dirname, tracks_processed, type="playlist", location=playlist["uri"], public=playlist["public"], collaborative=playlist["collaborative"])
+        write_playlist(
+            playlist["name"],
+            dirname,
+            tracks_processed,
+            type="playlist",
+            location=playlist["uri"],
+            public=playlist["public"],
+            collaborative=playlist["collaborative"]
+        )
 
     tracks = sp.current_user_saved_tracks()
     tracks_processed = process_tracks(tracks)
@@ -125,7 +144,9 @@ def import_playlist(sp, username, filename):
         location = elem.find("{http://xspf.org/ns/0/}location").text
         tracks.append(location)
 
-    elem_extension = root.find("{http://xspf.org/ns/0/}extension[@application='https://github.com/debfx/spotify-playlists']")
+    elem_extension = root.find(
+        "{http://xspf.org/ns/0/}extension[@application='https://github.com/debfx/spotify-playlists']"
+    )
     if elem_extension is not None:
         elem_public = elem_extension.find("{http://xspf.org/ns/0/}public")
         if elem_public is not None:
@@ -155,11 +176,13 @@ def main():
     config = configparser.ConfigParser()
     config.read(CONFIG_AUTH)
 
-    token = spotipy.util.prompt_for_user_token(config["spotify"]["username"],
-                                               " ".join(SCOPES),
-                                               config["spotify"]["client_id"],
-                                               config["spotify"]["client_secret"],
-                                               config["spotify"]["redirect_uri"])
+    token = spotipy.util.prompt_for_user_token(
+        config["spotify"]["username"],
+        " ".join(SCOPES),
+        config["spotify"]["client_id"],
+        config["spotify"]["client_secret"],
+        config["spotify"]["redirect_uri"]
+    )
     sp = spotipy.Spotify(auth=token)
 
     if command == "import":
