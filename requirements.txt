@@ -1,2 +1,2 @@
 jinja2
-spotipy
+spotipy>=2.17

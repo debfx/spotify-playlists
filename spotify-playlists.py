@@ -22,6 +22,8 @@ import xml.etree.ElementTree
 
 import jinja2
 import spotipy
+import spotipy.cache_handler
+import spotipy.oauth2
 import spotipy.util
 
 SCOPES = (
@@ -103,7 +105,7 @@ def export_playlists(sp, username, dirname):
     playlists = sp.user_playlists(username)
 
     for playlist in playlists["items"]:
-        tracks = sp.playlist_tracks(
+        tracks = sp.playlist_items(
             playlist["id"],
             fields="items(track(name,artists(name),uri)),next",
         )
@@ -177,14 +179,16 @@ def main():
     config = configparser.ConfigParser()
     config.read(CONFIG_AUTH)
 
-    token = spotipy.util.prompt_for_user_token(
-        config["spotify"]["username"],
-        " ".join(SCOPES),
-        config["spotify"]["client_id"],
-        config["spotify"]["client_secret"],
-        config["spotify"]["redirect_uri"],
+    auth_manager = spotipy.oauth2.SpotifyOAuth(
+        client_id=config["spotify"]["client_id"],
+        client_secret=config["spotify"]["client_secret"],
+        redirect_uri=config["spotify"]["redirect_uri"],
+        scope=" ".join(SCOPES),
+        cache_handler=spotipy.cache_handler.CacheFileHandler(
+            username=config["spotify"]["username"],
+        ),
     )
-    sp = spotipy.Spotify(auth=token)
+    sp = spotipy.Spotify(auth_manager=auth_manager)
 
     if command == "import":
         import_playlist(sp, config["spotify"]["username"], arg)
