@@ -105,6 +105,7 @@ def export_playlists(sp, username, dirname):
     for playlist in playlists["items"]:
         tracks = sp.playlist_tracks(
             playlist["id"],
+            fields="items(track(name,artists(name),uri)),next",
         )
         tracks_processed = process_tracks(tracks)
         while tracks["next"]:
