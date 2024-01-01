@@ -103,8 +103,12 @@ def export_playlists(sp, username, dirname):
         os.mkdir(dirname)
 
     playlists = sp.user_playlists(username)
+    playlist_items = playlists["items"]
+    while playlists["next"]:
+        playlists = sp.next(playlists)
+        playlist_items.extend(playlists["items"])
 
-    for playlist in playlists["items"]:
+    for playlist in playlist_items:
         tracks = sp.playlist_items(
             playlist["id"],
             fields="items(track(name,artists(name),uri)),next",
