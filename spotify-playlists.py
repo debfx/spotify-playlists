@@ -60,7 +60,7 @@ PLAYLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 
 def chunks(lst, n):
     for i in range(0, len(lst), n):
-        yield lst[i:i+n]
+        yield lst[i : i + n]
 
 
 def process_tracks(tracks):
@@ -87,7 +87,7 @@ def write_playlist(name, dirname, tracks, type, location=None, public=False, col
         tracklist=tracks,
         type=type,
         public=public,
-        collaborative=collaborative
+        collaborative=collaborative,
     )
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
@@ -117,7 +117,7 @@ def export_playlists(sp, username, dirname):
             type="playlist",
             location=playlist["uri"],
             public=playlist["public"],
-            collaborative=playlist["collaborative"]
+            collaborative=playlist["collaborative"],
         )
 
     tracks = sp.current_user_saved_tracks()
@@ -164,7 +164,10 @@ def import_playlist(sp, username, filename):
 
 def main():
     if len(sys.argv) != 3 or sys.argv[1] not in ("import", "export"):
-        print("Usage: {} <import FILENAME / export DIR>".format(sys.argv[0]), file=sys.stderr)
+        print(
+            "Usage: {} <import FILENAME / export DIR>".format(sys.argv[0]),
+            file=sys.stderr,
+        )
         sys.exit(0)
 
     command = sys.argv[1]
@@ -178,7 +181,7 @@ def main():
         " ".join(SCOPES),
         config["spotify"]["client_id"],
         config["spotify"]["client_secret"],
-        config["spotify"]["redirect_uri"]
+        config["spotify"]["redirect_uri"],
     )
     sp = spotipy.Spotify(auth=token)
 
