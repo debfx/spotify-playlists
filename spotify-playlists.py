@@ -109,6 +109,10 @@ def export_playlists(sp, username, dirname):
         playlist_items.extend(playlists["items"])
 
     for playlist in playlist_items:
+        # playlist sometimes contain null entries, skip them
+        if playlist is None:
+            continue
+
         tracks = sp.playlist_items(
             playlist["id"],
             fields="items(track(name,artists(name),uri)),next",
