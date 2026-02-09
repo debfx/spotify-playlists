@@ -15,6 +15,7 @@ Examples:
 
 ## Install
 
+* [uv](https://github.com/astral-sh/uv) must be installed
 * `uv sync`
 
 
