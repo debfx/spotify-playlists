@@ -15,8 +15,8 @@ Examples:
 
 ## Install
 
-* `python3 -m venv venv`
-* `venv/bin/pip install -r requirements.txt`
+* [uv](https://github.com/astral-sh/uv) must be installed
+* `uv sync --locked`
 
 
 ## Setup

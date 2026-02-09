@@ -1,0 +1,8 @@
+[project]
+name = "spotify-playlists"
+version = "0.1.0"
+requires-python = ">=3.8"
+dependencies = [
+    "jinja2>=3",
+    "spotipy>=2.17",
+]
