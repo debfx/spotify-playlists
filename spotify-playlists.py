@@ -102,7 +102,7 @@ def export_playlists(sp, username, dirname):
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
 
-    playlists = sp.user_playlists(username)
+    playlists = sp.current_user_playlists()
     playlist_items = playlists["items"]
     while playlists["next"]:
         playlists = sp.next(playlists)
