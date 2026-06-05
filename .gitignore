@@ -1,3 +1,5 @@
 auth.ini
 .cache-*
 playlists/
+__pycache__/
+requirements.txt

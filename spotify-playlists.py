@@ -30,6 +30,9 @@ SCOPES = (
     "playlist-read-collaborative",
     "playlist-read-private",
     "user-library-read",
+    "user-library-modify",
+    "user-follow-read",
+    "user-follow-modify",
     "playlist-modify-private",
     "playlist-modify-public",
 )
@@ -69,7 +72,8 @@ def process_tracks(tracks):
     result = []
 
     for item in tracks["items"]:
-        track = item["track"]
+        # The track object might be nested under "item" (new Web API rules) or "track" (legacy or saved tracks)
+        track = item.get("item") or item.get("track")
 
         if track is None:
             # some playlists have extra "null" tracks (without any information), just skip them
@@ -94,13 +98,20 @@ def write_playlist(name, dirname, tracks, type, location=None, public=False, col
 
     xspf_path = "{}/{}.xspf".format(dirname, name.replace("/", "_"))
 
-    with open(xspf_path, "w") as f:
+    with open(xspf_path, "w", encoding="utf-8") as f:
         f.write(content)
 
 
 def export_playlists(sp, username, dirname):
     if not os.path.isdir(dirname):
         os.mkdir(dirname)
+
+    # Retrieve canonical User ID from Spotify directly to handle cases where
+    # the configured username in auth.ini is an email address or display name.
+    try:
+        current_user_id = sp.current_user()["id"]
+    except Exception:
+        current_user_id = username
 
     playlists = sp.current_user_playlists()
     playlist_items = playlists["items"]
@@ -113,14 +124,27 @@ def export_playlists(sp, username, dirname):
         if playlist is None:
             continue
 
-        tracks = sp.playlist_items(
-            playlist["id"],
-            fields="items(track(name,artists(name),uri)),next",
-        )
-        tracks_processed = process_tracks(tracks)
-        while tracks["next"]:
-            tracks = sp.next(tracks)
-            tracks_processed.extend(process_tracks(tracks))
+        # Spotify API February 2026 update: Playlist contents (items) are only available
+        # for playlists the user owns or collaborates on.
+        is_owner = playlist.get("owner", {}).get("id") == current_user_id
+        is_collaborative = playlist.get("collaborative", False)
+        if not (is_owner or is_collaborative):
+            print(f"Skipping playlist '{playlist['name']}' as the user does not own or collaborate on it.", file=sys.stderr)
+            continue
+
+        try:
+            tracks = sp.playlist_items(
+                playlist["id"],
+                fields="items(item(name,artists(name),uri)),next",
+            )
+            tracks_processed = process_tracks(tracks)
+            while tracks["next"]:
+                tracks = sp.next(tracks)
+                tracks_processed.extend(process_tracks(tracks))
+        except spotipy.SpotifyException as e:
+            print(f"Error fetching tracks for playlist '{playlist['name']}': {e}", file=sys.stderr)
+            continue
+
         write_playlist(
             playlist["name"],
             dirname,
@@ -138,6 +162,87 @@ def export_playlists(sp, username, dirname):
         tracks_processed.extend(process_tracks(tracks))
     write_playlist("Saved tracks", dirname, tracks_processed, type="saved_tracks")
 
+    try:
+        albums = sp.current_user_saved_albums()
+        albums_processed = []
+        while albums:
+            for item in albums["items"]:
+                album = item["album"]
+                if album is None:
+                    continue
+                artists = ";".join([artist["name"] for artist in album["artists"]])
+                albums_processed.append({"title": album["name"], "artists": artists, "uri": album["uri"]})
+            if albums["next"]:
+                albums = sp.next(albums)
+            else:
+                break
+        write_playlist("Saved albums", dirname, albums_processed, type="saved_albums")
+    except spotipy.SpotifyException as e:
+        print(f"Error fetching saved albums: {e}", file=sys.stderr)
+
+    try:
+        artists_processed = []
+        results = sp.current_user_followed_artists(limit=50)
+        while results and "artists" in results:
+            artists_list = results["artists"]["items"]
+            for artist in artists_list:
+                artists_processed.append({
+                    "title": artist["name"],
+                    "artists": artist["name"],
+                    "uri": artist["uri"]
+                })
+            after = results["artists"]["cursors"]["after"]
+            if after:
+                results = sp.current_user_followed_artists(limit=50, after=after)
+            else:
+                break
+        write_playlist("Followed artists", dirname, artists_processed, type="followed_artists")
+    except spotipy.SpotifyException as e:
+        print(f"Error fetching followed artists: {e}", file=sys.stderr)
+
+    try:
+        shows = sp.current_user_saved_shows()
+        shows_processed = []
+        while shows:
+            for item in shows["items"]:
+                show = item["show"]
+                if show is None:
+                    continue
+                shows_processed.append({
+                    "title": show["name"],
+                    "artists": show.get("publisher", ""),
+                    "uri": show["uri"]
+                })
+            if shows["next"]:
+                shows = sp.next(shows)
+            else:
+                break
+        write_playlist("Followed podcasts", dirname, shows_processed, type="followed_podcasts")
+    except spotipy.SpotifyException as e:
+        print(f"Error fetching followed podcasts: {e}", file=sys.stderr)
+
+    try:
+        episodes = sp.current_user_saved_episodes()
+        episodes_processed = []
+        while episodes:
+            for item in episodes["items"]:
+                episode = item["episode"]
+                if episode is None:
+                    continue
+                show_name = episode.get("show", {}).get("name", "")
+                episodes_processed.append({
+                    "title": episode["name"],
+                    "artists": show_name,
+                    "uri": episode["uri"]
+                })
+            if episodes["next"]:
+                episodes = sp.next(episodes)
+            else:
+                break
+        write_playlist("Liked podcasts", dirname, episodes_processed, type="liked_podcasts")
+    except spotipy.SpotifyException as e:
+        print(f"Error fetching liked podcasts: {e}", file=sys.stderr)
+
 
 def import_playlist(sp, username, filename):
     tree = xml.etree.ElementTree.parse(filename)
@@ -147,6 +252,7 @@ def import_playlist(sp, username, filename):
     tracks = []
     public = False
     collaborative = False
+    playlist_type = "playlist"
 
     for elem in root.findall("{http://xspf.org/ns/0/}trackList/{http://xspf.org/ns/0/}track"):
         location = elem.find("{http://xspf.org/ns/0/}location").text
@@ -164,13 +270,39 @@ def import_playlist(sp, username, filename):
         if elem_collaborative is not None:
             collaborative = elem_collaborative.text.lower() == "true"
 
-    playlist_id = sp.user_playlist_create(username, name, public=public)["id"]
-    if collaborative:
-        sp.user_playlist_change_details(username, playlist_id, collaborative=collaborative)
+        elem_type = elem_extension.find("{http://xspf.org/ns/0/}type")
+        if elem_type is not None:
+            playlist_type = elem_type.text
 
-    # the Spotify API allows only 100 tracks per request
-    for tracks_chunk in chunks(tracks, 100):
-        sp.user_playlist_add_tracks(username, playlist_id, tracks_chunk)
+    # docs say limit is 50 but we get an error if more than 40
+    if playlist_type == "saved_tracks":
+        # Save tracks directly to user's library in chunks of 40 (API limit)
+        for tracks_chunk in chunks(tracks, 40):
+            sp.current_user_saved_tracks_add(tracks_chunk)
+    elif playlist_type == "saved_albums":
+        # Save albums directly to user's library in chunks of 40 (API limit)
+        for albums_chunk in chunks(tracks, 40):
+            sp.current_user_saved_albums_add(albums_chunk)
+    elif playlist_type == "followed_artists":
+        # Follow artists directly in chunks of 40 (API limit)
+        for artists_chunk in chunks(tracks, 40):
+            sp.user_follow_artists(artists_chunk)
+    elif playlist_type == "followed_podcasts":
+        # Follow podcast shows directly to user's library in chunks of 40 (API limit)
+        for shows_chunk in chunks(tracks, 40):
+            sp.current_user_saved_shows_add(shows_chunk)
+    elif playlist_type == "liked_podcasts":
+        # Save episodes directly to user's library in chunks of 40 (API limit)
+        for episodes_chunk in chunks(tracks, 40):
+            sp.current_user_saved_episodes_add(episodes_chunk)
+    else:
+        # Use current_user_playlist_create instead of deprecated user_playlist_create
+        # which used the removed POST /users/{user_id}/playlists endpoint.
+        playlist_id = sp.current_user_playlist_create(name, public=public, collaborative=collaborative)["id"]
+
+        # the Spotify API allows only 100 tracks per request
+        for tracks_chunk in chunks(tracks, 100):
+            sp.playlist_add_items(playlist_id, tracks_chunk)
 
 
 def main():

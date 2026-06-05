@@ -21,7 +21,7 @@ Examples:
 
 ## Setup
 
-* Create an app on [Spotify My Dashboard](https://developer.spotify.com/dashboard/applications)
-* Redirect URI can be anything (e.g. `http://localhost/`)
+* Create an app on [Spotify My Dashboard](https://developer.spotify.com/dashboard/applications) (requires Spotify Premium since February 11, 2026)
+* Redirect URI can be anything (e.g. `https://127.0.0.1/`)
 * Copy auth.ini.example to auth.ini
 * Insert the client id, token, redirect uri and Spotify username in auth.ini
